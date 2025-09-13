@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  full_name     String?
+  role         String    @default("user")
+  phone        String?
+  profile_picture String?
+  verification_status String @default("pending")
+  seller_badge Boolean   @default(false)
+  avg_rating   Float     @default(0.0)
+  rating_count Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt  
+  active   Boolean  @default(true)
+
+  otps                Otp[]
+  password     Password?
+
+  googleId            String?   @unique
+  provider            String?   @default("local")
+  products Product[]
+}
+
+model Password {
+  hash   String
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model Otp {
+  id          Int       @id @default(autoincrement())
+  selector    String    @unique
+  code        String?
+  codeHash    String
+  type        String
+  channel     String?   @default("EMAIL")
+  userId      String?
+  email       String?
+  attempts    Int       @default(0)
+  maxAttempts Int?
+  used        Boolean   @default(false)
+  consumedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+  User        User?     @relation(fields: [userId], references: [id])
+
+  @@index([email, type, expiresAt])
+  @@index([userId, type, expiresAt])
+}
+
+model Product {
+  id            String    @id @default(uuid())
+  title         String
+  description   String
+  price         Float
+  urgencyEndsAt DateTime?
+  imageUrls     String[]
+  country       String
+  state         String
+  city          String
+  street        String
+  status        ProductStatus @default(PENDING)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  categoryId    String
+  userId        String
+  category      Category   @relation(fields: [categoryId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Category {
+  id             String    @id @default(uuid())
+  name           String
+  percentageFee  Float
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  products       Product[]
+}
+
+enum ProductStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+  EXPIRED
+}

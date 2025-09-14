@@ -5,10 +5,10 @@ import { getPasswordHash } from '../src/utils/auth';
 const prisma = new PrismaClient();
 
 async function main() {
-  const hash = await getPasswordHash('password123@');
+  const hash = await getPasswordHash('Password123@');
 
   const existingAdmin = await prisma.user.findUnique({
-    where: { email: 'admin@gmail.com' },
+    where: { email: 'newAdmin@gmail.com' },
   });
 
   if (existingAdmin) {
@@ -18,8 +18,8 @@ async function main() {
 
   const adminUser = await prisma.user.create({
     data: {
-      email: 'admin@gmail.com',
-      full_name: 'Admin',
+      email: 'newAdmin@gmail.com',
+      full_name: 'Admin Doe',
       role: 'admin',
       phone: '+1234567890',
       verification_status: 'verified',

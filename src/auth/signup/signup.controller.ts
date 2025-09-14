@@ -4,6 +4,7 @@ import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { SignupDto } from './dto/signup.dto';
 import { SignupService } from './signup.service';
 import { ResendEmailDto, VerifyEmailDto } from './dto/verifyEmail.dto';
+import { SignupResponseDto } from './dto/signup-response.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -16,8 +17,9 @@ export class SignupController {
     summary: 'Register user',
   })
   @ApiResponse({
-    status: 200,
-    description: 'User registered successfully.',
+    status: HttpStatus.CREATED,
+    description: 'User registered successfully',
+    type: SignupResponseDto,
   })
   @ApiResponse({
     status: 400,

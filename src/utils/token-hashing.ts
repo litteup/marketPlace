@@ -12,3 +12,12 @@ export async function comparePasswordResetToken(
 ): Promise<boolean> {
   return bcrypt.compare(token, hashedToken);
 }
+
+/**
+ * Compares a plain-text token with a hashed token.
+ * @param token The plain-text token from the request.
+ * @returns Token.
+ */
+export async function hashResetToken(token: string): Promise<string> {
+  return bcrypt.hash(token, 12);
+}

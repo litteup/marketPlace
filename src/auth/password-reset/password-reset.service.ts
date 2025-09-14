@@ -2,8 +2,20 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as crypto from 'crypto';
 import { getPasswordHash } from 'src/utils/auth';
-import { comparePasswordResetToken } from 'src/utils/token-hashing';
 import { MailService } from 'src/mailer/mailer.service';
+import {
+  comparePasswordResetToken,
+  hashResetToken,
+} from 'src/utils/token-hashing';
+import { ChangePasswordDto } from './dto/change-password.dto';
+
+export type PasswordResetToken = {
+  id: string;
+  email: string;
+  token: string;
+  createdAt: Date;
+  expiresAt: Date;
+};
 @Injectable()
 export class PasswordResetService {
   constructor(
@@ -13,7 +25,7 @@ export class PasswordResetService {
 
   async generateResetToken(): Promise<{ token: string; hashedToken: string }> {
     const token = crypto.randomBytes(32).toString('hex');
-    const hashedToken = await getPasswordHash(token);
+    const hashedToken = await hashResetToken(token);
     return { token, hashedToken };
   }
 
@@ -39,7 +51,7 @@ export class PasswordResetService {
         data: {
           email,
           token: hashedToken,
-          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
         },
       });
     }
@@ -57,38 +69,49 @@ export class PasswordResetService {
     return 'If the email exists, a reset link will be sent to your email';
   }
 
-  async validateResetToken(token: string): Promise<string> {
-    // Check if token exists in database and is not expired
-    const resetToken = await this.prisma.passwordResetToken.findFirst({
+  async validateResetToken(
+    token: string,
+  ): Promise<{ userId: string; email: string }> {
+    // Get all non-expired tokens
+    const resetTokens = await this.prisma.passwordResetToken.findMany({
       where: {
         expiresAt: { gt: new Date() },
       },
     });
 
-    if (
-      !resetToken ||
-      !(await comparePasswordResetToken(token, resetToken.token))
-    ) {
+    if (resetTokens.length === 0) {
       throw new BadRequestException('Invalid or expired reset token');
     }
 
-    // Now we can find the user since the token is valid
+    // Find the token that matches the provided token
+    let validToken: PasswordResetToken | null = null;
+    for (const resetToken of resetTokens) {
+      const isValid = await comparePasswordResetToken(token, resetToken.token);
+      if (isValid) {
+        validToken = resetToken;
+        break;
+      }
+    }
+
+    if (!validToken) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    // Find the user associated with this token
     const user = await this.prisma.user.findUnique({
-      where: { email: resetToken.email },
+      where: { email: validToken.email },
     });
 
     if (!user) {
       throw new BadRequestException('Invalid reset token');
     }
 
-    return user.id;
+    return { userId: user.id, email: validToken.email };
   }
 
   async resetPassword(token: string, newPassword: string): Promise<void> {
     try {
-      console.log('token', token);
-      // Validate the token and get the user ID
-      const userId = await this.validateResetToken(token);
+      const { userId, email } = await this.validateResetToken(token);
 
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
@@ -110,15 +133,66 @@ export class PasswordResetService {
           },
         }),
         this.prisma.passwordResetToken.deleteMany({
-          where: { email: user.email },
+          where: { email },
         }),
       ]);
-
-      // Optional: Invalidate user sessions
-      // You can add this logic back if you have a session model
     } catch (error) {
       console.log(error);
       throw new BadRequestException('Password reset failed.');
+    }
+  }
+
+  async changePassword(
+    userId: string,
+    changePasswordDto: ChangePasswordDto,
+  ): Promise<void> {
+    const { new_password } = changePasswordDto;
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        full_name: true,
+        password: true,
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    const hashedPassword = await getPasswordHash(new_password);
+
+    if (user.password) {
+      //update existing password
+      await this.prisma.password.update({
+        where: { userId },
+        data: {
+          hash: hashedPassword,
+        },
+      });
+    } else {
+      //create a password record
+      await this.prisma.password.create({
+        data: {
+          hash: hashedPassword,
+          userId: user.id,
+        },
+      });
+    }
+    //send email
+    try {
+      const emailSent = await this.mailService.sendPasswordChangeEmail(
+        user.email,
+        user.full_name || 'There',
+      );
+
+      if (!emailSent) {
+        console.warn(`Failed to send password change email to ${user.email}`);
+      }
+    } catch (error) {
+      console.error('Error sending password change email:', error);
     }
   }
 

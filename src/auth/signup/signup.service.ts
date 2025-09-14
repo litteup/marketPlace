@@ -10,6 +10,7 @@ import { OtpService } from 'src/mailer/otp.service';
 import { OtpType } from 'src/mailer/otp.types';
 
 import { UsersService } from 'src/users/users.service';
+import { SignupResponseDto } from './dto/signup-response.dto';
 
 @Injectable()
 export class SignupService {
@@ -21,69 +22,82 @@ export class SignupService {
     private mailService: MailService,
   ) {}
 
-  async signup(data: Prisma.UserCreateInput): Promise<{
-    full_name: string | null;
-    email: string;
-    role: string;
-    verification_status: string;
-    message: string;
-    otp_debug?: string; // For development only
-  }> {
-    const existingUser = await this.usersService.findOneByEmail(data.email);
-
-    if (existingUser) {
-      if (existingUser.email === data.email) {
-        throw new ConflictException('Invalid credentials');
-      }
-    }
-
-    // Create user with unverified status
-    const { full_name, email, role, verification_status } =
-      await this.usersService.create(data);
-
-    let message: string;
-    let otpDebugCode: string | undefined;
-
+  async signup(data: Prisma.UserCreateInput): Promise<SignupResponseDto> {
     try {
-      // Generate OTP
-      const otpResult = await this.otpService.generateOtp(
-        email,
-        OtpType.EMAIL_VERIFICATION,
-        { debug: true }, // Enable debug to get the code
-      );
+      const existingUser = await this.usersService.findOneByEmail(data.email);
 
-      otpDebugCode = otpResult.code;
-
-      // Send OTP email
-      const emailSent = await this.mailService.sendOtpEmail(
-        email,
-        otpResult.code,
-      );
-
-      if (emailSent) {
-        message = `User registered successfully. OTP sent to ${email}.`;
-      } else {
-        message = `User registered but email failed. Debug OTP: ${otpDebugCode}`;
+      if (existingUser) {
+        if (existingUser.email === data.email) {
+          throw new ConflictException('User with this email already exists');
+        }
       }
+
+      // Create user with unverified status
+      const { id, full_name, email, role, verification_status } =
+        await this.usersService.create(data);
+
+      let message: string;
+      let otpDebugCode: string | undefined;
+
+      try {
+        // Generate OTP
+        const otpResult = await this.otpService.generateOtp(
+          email,
+          OtpType.EMAIL_VERIFICATION,
+          { debug: true }, // Enable debug to get the code
+        );
+
+        otpDebugCode = otpResult.code;
+
+        // Send OTP email
+        const emailSent = await this.mailService.sendOtpEmail(
+          email,
+          otpResult.code,
+        );
+
+        if (emailSent) {
+          message = `User registered successfully. OTP sent to ${email}.`;
+        } else {
+          message = `User registered but email failed. Debug OTP: ${otpDebugCode}`;
+        }
+      } catch (error) {
+        this.logger.error('OTP processing failed:', error);
+        message =
+          'User registered but OTP processing failed. Please try again.';
+      }
+
+      const response: SignupResponseDto = {
+        id,
+        full_name,
+        email,
+        role,
+        verification_status,
+        message,
+      };
+
+      // Only include debug code in development
+      if (otpDebugCode && process.env.NODE_ENV !== 'production') {
+        response.otp_debug = otpDebugCode;
+      }
+
+      return response;
     } catch (error) {
-      this.logger.error('OTP processing failed:', error);
-      message = 'User registered but OTP processing failed. Please try again.';
+      this.logger.error('Signup failed:', error);
+
+      if (error instanceof ConflictException) {
+        throw error;
+      }
+
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          throw new ConflictException('User with this email already exists');
+        }
+      }
+
+      throw new InternalServerErrorException(
+        'Signup failed. Please try again.',
+      );
     }
-
-    const response: any = {
-      full_name,
-      email,
-      role,
-      verification_status,
-      message,
-    };
-
-    // Only include debug code in development
-    if (otpDebugCode && process.env.NODE_ENV !== 'production') {
-      response.otp_debug = otpDebugCode;
-    }
-
-    return response;
   }
 
   // verify email with OTP

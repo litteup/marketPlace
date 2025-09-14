@@ -4,14 +4,14 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import * as session from 'express-session';
 import * as dotenv from 'dotenv';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 dotenv.config();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.setGlobalPrefix('api/v1');
-
-  // app.enableCors({})
 
   app.enableCors({
     origin: process.env.FRONTEND_URL || 'http://localhost:3000',
@@ -21,7 +21,20 @@ async function bootstrap() {
   });
 
   // Enable validation
-  app.useGlobalPipes(new ValidationPipe());
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      transformOptions: {
+        enableImplicitConversion: true,
+      },
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
+
+  // Apply the exception filter globally
+  app.useGlobalInterceptors(new ResponseInterceptor());
+  app.useGlobalFilters(new HttpExceptionFilter());
 
   // Swagger configuration
   const config = new DocumentBuilder()
@@ -31,8 +44,9 @@ async function bootstrap() {
     .addTag('Health', 'API health check endpoints')
     .addTag('Auth', 'Authentication endpoints')
     .addTag('Users', 'User management endpoints')
-    .addTag('Listings', 'Product listing endpoints')
+    .addTag('Listing', 'Product listing endpoints')
     .addTag('Offers', 'Offer management endpoints')
+    .addTag('Admin', 'Admin management endpoints')
     .addBearerAuth()
     .build();
 

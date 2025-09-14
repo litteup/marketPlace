@@ -43,4 +43,25 @@ export class MailService {
       return false;
     }
   }
+
+  async sendPasswordChangeEmail(
+    email: string,
+    full_name: string,
+  ): Promise<boolean> {
+    try {
+      await this.mailerService.sendMail({
+        to: email,
+        subject: 'Password Change Success',
+        template: './change-password',
+        context: {
+          email,
+          name: full_name,
+        },
+      });
+      return true;
+    } catch (error) {
+      console.error('Failed to send reset email', error);
+      return false;
+    }
+  }
 }

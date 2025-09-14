@@ -1,21 +1,57 @@
 import {
-  // BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   HttpCode,
   Post,
-  // Session,
+  Session,
 } from '@nestjs/common';
 import { PasswordResetService } from './password-reset.service';
-import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiCookieAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ValidateResetTokenDto } from './dto/validate-reset-token.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { ResponseUtil } from 'src/common/utils/response.util';
 
 @ApiTags('Auth')
 @Controller('password-reset')
 export class PasswordResetController {
   constructor(private readonly passwordResetService: PasswordResetService) {}
+
+  @Post('change-password')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Change password while logged in' })
+  @ApiResponse({
+    status: 200,
+    description: 'Password changed successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Not authenticated' })
+  @ApiCookieAuth()
+  @ApiBody({
+    type: ChangePasswordDto,
+  })
+  async changePassword(
+    @Session() session: Record<string, any>,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
+    const userId: string = session.userId;
+    if (!userId) {
+      throw new ForbiddenException(
+        'You do not have permission to change password',
+      );
+    }
+
+    await this.passwordResetService.changePassword(userId, changePasswordDto);
+
+    return ResponseUtil.success('Password Change Successfull');
+  }
 
   //forgot-password
   @Post('forgot')
@@ -39,10 +75,7 @@ export class PasswordResetController {
     const message = await this.passwordResetService.requestPasswordReset(
       forgotPasswordDto.email,
     );
-    return {
-      message,
-      success: true,
-    };
+    return ResponseUtil.success(message);
   }
 
   //validate token
@@ -59,7 +92,7 @@ export class PasswordResetController {
       validateResetTokenDto.token,
     );
     return {
-      message: 'Toke is valid',
+      message: 'Token is valid',
       valid: true,
       userId,
     };
@@ -77,32 +110,7 @@ export class PasswordResetController {
       resetPasswordDto.token,
       resetPasswordDto.new_password,
     );
-    return {
-      message: 'Password reset successfully',
-      success: true,
-    };
+
+    return ResponseUtil.success('Password reset successfully');
   }
-
-  // @Post('change-password')
-  // @HttpCode(200)
-  // @ApiOperation({ summary: 'Change password while logged in' })
-  // @ApiResponse({ status: 200, description: 'Password changed successfully' })
-  // @ApiResponse({ status: 401, description: 'Not authenticated' })
-  // async changePassword(
-  //   @Session() session: any,
-  //   @Body() body: { currentPassword: string; newPassword: string },
-  // ) {
-  //   if (!session.userId) {
-  //     throw new BadRequestException('Not authenticated');
-  //   }
-
-  //   // Implement password change logic here
-  //   // Verify current password, then update to new password
-  //   // Invalidate other sessions if needed
-
-  //   return {
-  //     message: 'Password changed successfully',
-  //     success: true,
-  //   };
-  // }
 }

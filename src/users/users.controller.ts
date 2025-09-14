@@ -1,3 +1,5 @@
+import { SessionAuthGuard } from 'src/auth/guards/session-auth.guard';
+
 import {
   Body,
   Controller,
@@ -9,16 +11,17 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import { UsersService } from './users.service';
 import {
+  ApiCookieAuth,
   ApiOperation,
   ApiResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { User } from '@prisma/client';
+
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { SessionAuthGaurd } from 'src/auth/guards/session-auth.gaurd';
+import { UsersService } from './users.service';
 
 @ApiTags('Users')
 @Controller('users')
@@ -36,9 +39,9 @@ export class UsersController {
     description: 'Current user profile',
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  @UseGuards(SessionAuthGaurd)
+  @UseGuards(SessionAuthGuard)
+  @ApiCookieAuth()
   @Get('profile')
-  // TODO add a current user ID
   async getProfile(@Session() session: Record<string, any>): Promise<User> {
     const userId: string = session.userId;
     if (!userId) {
@@ -60,7 +63,8 @@ export class UsersController {
     description: 'Profile updated by id',
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  @UseGuards(SessionAuthGaurd)
+  @UseGuards(SessionAuthGuard)
+  @ApiCookieAuth()
   @Put('profile')
   async updateProfile(
     @Session() session: Record<string, any>,

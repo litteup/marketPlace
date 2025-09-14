@@ -8,26 +8,29 @@ datasource db {
 }
 
 model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
-  full_name     String?
-  role         String    @default("user")
-  phone        String?
-  profile_picture String?
-  verification_status String @default("pending")
-  seller_badge Boolean   @default(false)
-  avg_rating   Float     @default(0.0)
-  rating_count Int       @default(0)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt  
-  active   Boolean  @default(true)
-
+  id                  String         @id @default(uuid())
+  email               String         @unique
+  role                String         @default("user")
+  phone               String?
+  profile_picture     String?
+  verification_status String         @default("pending")
+  seller_badge        Boolean        @default(false)
+  avg_rating          Float          @default(0.0)
+  rating_count        Int            @default(0)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  full_name           String?
+  active              Boolean        @default(true)
+  googleId            String?        @unique
+  provider            String?        @default("local")
   otps                Otp[]
-  password     Password?
-
-  googleId            String?   @unique
-  provider            String?   @default("local")
-  products Product[]
+  password            Password?
+  products            Product[]
+  offers              Offer[]
+  buyerTransactions   Transaction[]  @relation("BuyerTransactions")
+  sellerTransactions  Transaction[]  @relation("SellerTransactions")
+  transactions        Transaction[]
+  notifications       Notification[]
 }
 
 model Password {
@@ -71,7 +74,7 @@ model Otp {
 }
 
 model Product {
-  id            String    @id @default(uuid())
+  id            String        @id @default(uuid())
   title         String
   description   String
   price         Float
@@ -82,23 +85,69 @@ model Product {
   city          String
   street        String
   status        ProductStatus @default(PENDING)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
   categoryId    String
   userId        String
-  category      Category   @relation(fields: [categoryId], references: [id])
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category      Category      @relation(fields: [categoryId], references: [id])
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  offers        Offer[]
+  Transaction   Transaction[]
 }
 
 model Category {
-  id             String    @id @default(uuid())
-  name           String
-  percentageFee  Float
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id            String    @id @default(uuid())
+  name          String
+  percentageFee Float
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  products      Product[]
+}
 
-  products       Product[]
+model Offer {
+  id            String        @id @default(uuid())
+  productId     String
+  userId        String
+  status        OfferStatus   @default(PENDING)
+  counterAmount Decimal
+  createdAt     DateTime      @default(now())
+  respondedAt   DateTime?
+  product       Product       @relation(fields: [productId], references: [id])
+  user          User          @relation(fields: [userId], references: [id])
+  transactions  Transaction[]
+}
+
+model Transaction {
+  id        String   @id @default(uuid())
+  productId String
+  buyerId   String
+  sellerId  String
+  offerId   String?
+  amount    Decimal
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id])
+  buyer     User     @relation("BuyerTransactions", fields: [buyerId], references: [id])
+  seller    User     @relation("SellerTransactions", fields: [sellerId], references: [id])
+  offer     Offer?   @relation(fields: [offerId], references: [id])
+  User      User?    @relation(fields: [userId], references: [id])
+  userId    String?
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  message   String
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id])
+}
+
+enum OfferStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  WITHDRAWN
 }
 
 enum ProductStatus {
@@ -106,4 +155,9 @@ enum ProductStatus {
   ACTIVE
   INACTIVE
   EXPIRED
+}
+
+enum NotificationType {
+  IN_APP
+  EMAIL
 }

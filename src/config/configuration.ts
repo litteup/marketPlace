@@ -6,7 +6,7 @@ const schema = z.object({
     .enum(['development', 'production', 'test'])
     .default('development'),
   SESSION_SECRET: z.string().default('some-secret'),
-  SESSION_MAX_AGE: z.string().default('86400'),
+  SESSION_MAX_AGE: z.string().default('2592000000'),
   BCRYPT_SALT_ROUNDS: z.string().default('10'),
 });
 

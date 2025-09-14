@@ -1,3 +1,5 @@
+import { SessionService } from 'src/utils/session/session.service';
+
 import {
   Controller,
   Delete,
@@ -5,7 +7,6 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import { DeleteAccountService } from './delete-account.service';
 import {
   ApiBadRequestResponse,
   ApiCookieAuth,
@@ -13,8 +14,9 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { SessionAuthGaurd } from '../guards/session-auth.gaurd';
-import { SessionService } from 'src/utils/session/session.service';
+
+import { SessionAuthGuard } from '../guards/session-auth.guard';
+import { DeleteAccountService } from './delete-account.service';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -29,7 +31,7 @@ export class DeleteAccountController {
     description: 'Account successfuly deleted',
   })
   @ApiBadRequestResponse({ description: 'Something went worng' })
-  @UseGuards(SessionAuthGaurd)
+  @UseGuards(SessionAuthGuard)
   @ApiCookieAuth()
   @Delete('delete-account')
   async delete(@Session() session: Record<string, any>): Promise<string> {

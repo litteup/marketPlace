@@ -47,7 +47,7 @@ export class OtpService {
   }
 
   private generateNumericCode(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    return Math.floor(1000 + Math.random() * 9000).toString();
   }
 
   async generateOtp(
@@ -168,7 +168,7 @@ export class OtpService {
       verified: true,
       purpose: type,
       userId: otpRecord.userId,
-      email: otpRecord.email, // ✅ matches new interface type
+      email: otpRecord.email,
     };
   }
 }
